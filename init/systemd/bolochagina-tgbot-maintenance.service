@@ -1,0 +1,12 @@
+[Unit]
+Requires=network-online.target
+After=network-online.target
+Conflicts=bolochagina-tgbot.service
+
+[Service]
+Type=forking
+ExecStart=/usr/local/bin/bolochagina-tgbot -m
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

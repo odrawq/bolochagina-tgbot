@@ -1,0 +1,13 @@
+[Unit]
+Requires=network-online.target
+After=network-online.target
+Conflicts=bolochagina-tgbot-maintenance.service
+OnFailure=bolochagina-tgbot-maintenance.service
+
+[Service]
+Type=forking
+ExecStart=/usr/local/bin/bolochagina-tgbot
+Restart=no
+
+[Install]
+WantedBy=multi-user.target
