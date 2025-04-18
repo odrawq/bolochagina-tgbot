@@ -16,6 +16,8 @@
 static void handle_updates(cJSON *updates, const int maintenance_mode);
 static void *handle_message_in_maintenance_mode(void *cjson_message);
 static void *handle_message_in_default_mode(void *cjson_message);
+static void *handle_callback_query_in_maintenance_mode(void *cjson_callback_query);
+static void *handle_callback_query_in_default_mode(void *cjson_callback_query);
 static void handle_question(const int_fast64_t chat_id,
                             const int root_access,
                             const char *username,
@@ -71,6 +73,23 @@ static void handle_updates(cJSON *updates, const int maintenance_mode)
                     __func__);
 
             pthread_detach(handle_message_thread);
+        }
+
+        const cJSON *callback_query = cJSON_GetObjectItem(update, "callback_query");
+
+        if (callback_query)
+        {
+            pthread_t handle_callback_query_thread;
+
+            if (pthread_create(&handle_callback_query_thread,
+                               NULL,
+                               maintenance_mode ? handle_callback_query_in_maintenance_mode : handle_callback_query_in_default_mode,
+                               cJSON_Duplicate(callback_query, 1)))
+                die("%s: %s: failed to create handle_callback_query_thread",
+                    __BASE_FILE__,
+                    __func__);
+
+            pthread_detach(handle_callback_query_thread);
         }
     }
 }
@@ -133,6 +152,107 @@ exit:
     return NULL;
 }
 
+static void *handle_callback_query_in_maintenance_mode(void *cjson_callback_query)
+{
+    cJSON *callback_query = cjson_callback_query;
+
+    answer_callback_query(cJSON_GetStringValue(cJSON_GetObjectItem(callback_query, "id")));
+
+    send_message_with_keyboard(cJSON_GetNumberValue(cJSON_GetObjectItem(cJSON_GetObjectItem(callback_query, "from"), "id")),
+                               EMOJI_FAILED " Извините, бот временно недоступен\n\n"
+                               "Проводятся технические работы. Пожалуйста, ожидайте!",
+                               "");
+
+    cJSON_Delete(callback_query);
+    return NULL;
+}
+
+static void *handle_callback_query_in_default_mode(void *cjson_callback_query)
+{
+    cJSON *callback_query = cjson_callback_query;
+
+    const char *callback_query_id = cJSON_GetStringValue(cJSON_GetObjectItem(callback_query, "id"));
+    const char *callback_query_data = cJSON_GetStringValue(cJSON_GetObjectItem(callback_query, "data"));
+
+    answer_callback_query(callback_query_id);
+
+    const int_fast64_t chat_id = cJSON_GetNumberValue(cJSON_GetObjectItem(cJSON_GetObjectItem(callback_query, "from"), "id"));
+
+    if (!strcmp(callback_query_data, "fittings"))
+        send_message_with_keyboard(chat_id,
+                                   EMOJI_INFO " Фурнитура - это различные детали и механизмы для сборки и крепления конструкций\n\n"
+                                   "- Петли: для соединения подвижных элементов (двери, окна, крышки);\n"
+                                   "- Замки: для безопасности и блокировки;\n"
+                                   "- Ручки: для управления подвижными частями;\n"
+                                   "- Направляющие и ролики: для плавного движения;\n"
+                                   "- Газлифт: для мягкого закрытия дверей;\n"
+                                   "- Автоматические системы: дистанционное управление дверьми.",
+                                   "");
+    else if (!strcmp(callback_query_data, "materials"))
+        send_message_with_keyboard(chat_id,
+                                   EMOJI_INFO " Материалы в мебельном производстве\n\n"
+                                   "- Древесина: каркасы, фасады, столешницы;\n"
+                                   "- Фанера: фасады, задние стенки;\n"
+                                   "- ДСП: задние стенки, днища ящиков;\n"
+                                   "- МДФ: фасады, задние стенки;\n"
+                                   "- Стекло: фасады, столешницы;\n"
+                                   "- Металл: каркасы, опоры, ножки;\n"
+                                   "- Пластик: задние стенки, днища ящиков;\n"
+                                   "- Ткань: обивка мебели, чехлы.",
+                                   "");
+    else if (!strcmp(callback_query_data, "fasteners"))
+        send_message_with_keyboard(chat_id,
+                                   EMOJI_INFO " Крепёж - это элементы для соединения частей конструкций\n\n"
+                                   "- Саморезы: для деревянных деталей;\n"
+                                   "- Евровинт: с шестигранной головкой;\n"
+                                   "- Шканты: цилиндры из дерева;\n"
+                                   "- Стяжка: фиксация и выравнивание элементов;\n"
+                                   "- Эксцентрик: регулировка положения элементов.\n\n"
+                                   "Редактирование крепежа осуществляется в модуле Базис-Мебельщик.",
+                                   "");
+    else if (!strcmp(callback_query_data, "edge_band"))
+        send_message_with_keyboard(chat_id,
+                                   EMOJI_INFO " Кромка - материал для закрытия торцов панелей\n\n"
+                                   "- ПВХ-кромка: для ЛДСП, МДФ;\n"
+                                   "- Меламиновая: устойчива к влаге;\n"
+                                   "- Алюминиевая: защита от коррозии;\n"
+                                   "- Акриловая: устойчива к химии;\n"
+                                   "- Кромка из дерева: элегантный внешний вид;\n"
+                                   "- Кромка с плёнкой: декоративные варианты;\n"
+                                   "- Кромка с фрезеровкой: оригинальный дизайн.",
+                                   "");
+    else if (!strcmp(callback_query_data, "design_functions"))
+        send_message_with_keyboard(chat_id,
+                                   EMOJI_INFO " Функции проектирования\n\n"
+                                   "- 'Растянуть и сдвинуть элементы': выделите область, укажите точку и переместите;\n"
+                                   "- 'Растянуть и сдвинуть выделенные элементы': работает только с выделенными объектами;\n"
+                                   "- 'Выделить окном': выделение элементов в зависимости от направления движения мыши.",
+                                   "");
+    else if (!strcmp(callback_query_data, "copying"))
+        send_message_with_keyboard(chat_id,
+                                   EMOJI_INFO " Функции копирования\n\n"
+                                   "- 'Копировать': вставка в другой файл;\n"
+                                   "- 'Копировать по точкам': внутри одного файла, возможен поворот и отражение.",
+                                   "");
+    else if (!strcmp(callback_query_data, "fastener_count"))
+        send_message_with_keyboard(chat_id,
+                                   EMOJI_INFO " Количество креплений\n\n"
+                                   "- До 200 мм: 1 крепление;\n"
+                                   "- 200–700 мм: 2 крепления;\n"
+                                   "- 700–1200 мм: 3 крепления;\n"
+                                   "- 1200–2000 мм: 4 крепления;\n"
+                                   "- Более 2000 мм: 5 креплений.\n\n"
+                                   EMOJI_INFO " Количество петель\n\n"
+                                   "- До 950 мм: 2 петли;\n"
+                                   "- 950–1500 мм: 3 петли;\n"
+                                   "- 1500–2000 мм: 4 петли;\n"
+                                   "- Более 2000 мм: 5 петель.",
+                                   "");
+
+    cJSON_Delete(callback_query);
+    return NULL;
+}
+
 static void handle_question(const int_fast64_t chat_id,
                             const int root_access,
                             const char *username,
@@ -150,7 +270,7 @@ static void handle_question(const int_fast64_t chat_id,
     {
         set_state(chat_id, "question_description_state", 0);
         send_message_with_keyboard(chat_id,
-                                   EMOJI_OK " Действие отменено",
+                                   EMOJI_OK " Создание вопроса отменено",
                                    get_current_keyboard(chat_id));
         return;
     }
@@ -235,52 +355,8 @@ static void handle_command(const int_fast64_t chat_id,
 static void handle_faq_command(const int_fast64_t chat_id)
 {
     send_message_with_keyboard(chat_id,
-                               EMOJI_INFO " ФУРНИТУРА\n"
-                               "Фурнитура — это детали и механизмы для сборки и крепления конструкций.\n\n"
-                               EMOJI_INFO " ВИДЫ ФУРНИТУРЫ\n"
-                               "- Петли: соединяют подвижные элементы (двери, окна)\n"
-                               "- Замки: обеспечивают безопасность\n"
-                               "- Ручки: для управления подвижными элементами\n"
-                               "- Направляющие и ролики: для плавного движения\n"
-                               "- Газлифт: плавное закрытие дверей\n"
-                               "- Автоматика: дистанционное управление\n\n"
-                               EMOJI_INFO " МАТЕРИАЛЫ\n"
-                               "- Древесина: каркасы, фасады\n"
-                               "- Фанера: фасады, стенки\n"
-                               "- ДСП, МДФ: стенки, днища, фасады\n"
-                               "- Стекло, металл, пластик: декоративные и опорные элементы\n"
-                               "- Ткань: обивка и чехлы\n\n"
-                               EMOJI_INFO " КРЕПЕЖ\n"
-                               "- Саморезы: для дерева\n"
-                               "- Евровинт: с шестигранной головкой\n"
-                               "- Шканты: деревянные стержни\n"
-                               "- Стяжка: фиксация и выравнивание\n"
-                               "- Эксцентрик: регулировка положения\n\n"
-                               EMOJI_INFO " КРОМКА\n"
-                               "- ПВХ, меламиновая: защита и декор\n"
-                               "- Алюминиевая, акриловая: стойкость к воздействиям\n"
-                               "- Деревянная, с пленкой или фрезеровкой: дизайн\n\n"
-                               EMOJI_INFO " ФУНКЦИИ ПРОЕКТИРОВАНИЯ\n"
-                               "1. Растянуть и сдвинуть элементы\n"
-                               "2. Растянуть выделенные элементы\n"
-                               "3. Выделение окном (в зависимости от направления)\n\n"
-                               EMOJI_INFO " ФУНКЦИИ КОПИРОВАНИЯ\n"
-                               "- Копировать: вставка в другой файл\n"
-                               "- По точкам: внутри одного файла, возможен поворот\n\n"
-                               EMOJI_INFO " РЕКОМЕНДАЦИИ ПО КРЕПЛЕНИЯМ\n"
-                               "- До 200 мм: 1 крепление\n"
-                               "- 200–700 мм: 2 крепления\n"
-                               "- 700–1200 мм: 3 крепления\n"
-                               "- 1200–2000 мм: 4 крепления\n"
-                               "- Более 2000 мм: 5 креплений\n\n"
-                               EMOJI_INFO " ПЕТЛИ\n"
-                               "- До 950 мм: 2 петли\n"
-                               "- 950–1500 мм: 3 петли\n"
-                               "- 1500–2000 мм: 4 петли\n"
-                               "- Более 2000 мм: 5 петель\n\n"
-                               EMOJI_INFO " ПРИМЕЧАНИЕ\n"
-                               "Расстановку крепежа можно редактировать в модуле Базис-Мебельщик.",
-                               "");
+                               EMOJI_QUESTION "Что вас интересует",
+                               FAQ_INLINEKEYBOARD);
 }
 
 static void handle_ask_command(const int_fast64_t chat_id, const char *username)

@@ -138,18 +138,14 @@ void send_message_with_keyboard(const int_fast64_t chat_id, const char *message,
             __func__);
 
     char post_fields[MAX_POSTFIELDS_SIZE];
-    int written = snprintf(post_fields,
-                           sizeof post_fields,
-                           "chat_id=%" PRIdFAST64
-                           "&text=%s"
-                           "&reply_markup=%s",
-                           chat_id,
-                           escaped_message,
-                           keyboard);
-
-    if (written >= MAX_POSTFIELDS_SIZE)
-        die("%s: %s: post_fields overflow (%d)", __BASE_FILE__, __func__, written);
-
+    snprintf(post_fields,
+             sizeof post_fields,
+             "chat_id=%" PRIdFAST64
+             "&text=%s"
+             "&reply_markup=%s",
+             chat_id,
+             escaped_message,
+             keyboard);
 
     curl_easy_setopt(curl, CURLOPT_URL, BOT_API_URL "/sendMessage");
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_fields);
@@ -164,6 +160,36 @@ void send_message_with_keyboard(const int_fast64_t chat_id, const char *message,
     while (++retries < MAX_REQUEST_RETRIES);
 
     curl_free(escaped_message);
+    curl_easy_cleanup(curl);
+}
+
+void answer_callback_query(const char *callback_query_id)
+{
+    CURL *curl = curl_easy_init();
+
+    if (!curl)
+        die("%s: %s: failed to initialize curl",
+            __BASE_FILE__,
+            __func__);
+
+    char post_fields[MAX_POSTFIELDS_SIZE];
+    snprintf(post_fields,
+             sizeof post_fields,
+             "callback_query_id=%s",
+             callback_query_id);
+
+    curl_easy_setopt(curl, CURLOPT_URL, BOT_API_URL "/answerCallbackQuery");
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_fields);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, MAX_CONNECT_TIMEOUT);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, MAX_RESPONSE_TIMEOUT);
+
+    int retries = 0;
+
+    do
+        if (curl_easy_perform(curl) == CURLE_OK)
+            break;
+    while (++retries < MAX_REQUEST_RETRIES);
+
     curl_easy_cleanup(curl);
 }
 
